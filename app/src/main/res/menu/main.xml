@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/Bluetooth_enable"
+        android:orderInCategory="100"
+        android:title="Bluetooth Enable"
+       />
+    <item
+        android:id="@+id/Bluetooth_disable"
+        android:title="Bluetooth Disable"
+        />
+    <item
+        android:id="@+id/bluetooth_discover"
+        android:title="Bluetooth discover"
+        />
+    <item
+        android:id="@+id/bluetooth_connect"
+        android:title="Connect"
+        />
+    <item
+        android:id="@+id/bluetooth_disconnect"
+        android:title="Disconnect"
+        />
+
+</menu>
