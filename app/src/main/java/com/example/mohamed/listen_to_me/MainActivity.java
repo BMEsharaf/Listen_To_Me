@@ -69,19 +69,7 @@ public class MainActivity extends Activity  {
     Handler bluetoothIn ;
     int handlerState ;
 
-    int viewsId[] = {R.drawable.a, R.drawable.b, R.drawable.c, R.drawable.d, R.drawable.e
-            , R.drawable.f, R.drawable.g, R.drawable.h, R.drawable.i, R.drawable.j,
-            R.drawable.k, R.drawable.l, R.drawable.m, R.drawable.n, R.drawable.o,
-            R.drawable.p, R.drawable.q, R.drawable.r, R.drawable.s, R.drawable.t,
-            R.drawable.u, R.drawable.v, R.drawable.w, R.drawable.x, R.drawable.y,
-            R.drawable.z, R.drawable.aa,R.drawable.bb, R.drawable.cc,R.drawable.dd,
-            R.drawable.ee,R.drawable.ff,R.drawable.gg,R.drawable.hh,
-            R.drawable.ii,R.drawable.jj,R.drawable.kk, R.drawable.ll,R.drawable.mm,R.drawable.nn,
-            R.drawable.oo,R.drawable.pp,R.drawable.qq,R.drawable.rr,R.drawable.ss,R.drawable.tt,R.drawable.uu,
-            R.drawable.vv,R.drawable.ww,R.drawable.xx,R.drawable.yy,R.drawable.zz ,R.drawable.ab,R.drawable.ba ,R.drawable.ba,R.drawable.nul1};
-    char signChar[] = {'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z','ا',
-            'ب','ت','ث','ج','ح','خ','د','ذ','ر','ز','س','ش','ص','ض','ط','ظ','ع','غ','ف','ق','ك','ل','م','ن','ه','و','ى','ي',' '};
-    int  VOICE_RECOGNITION = 1 , result;
+       int  VOICE_RECOGNITION = 1 , result;
     TextView textView ;
     private final int progress_bar_type = 0 ;
     ProgressDialog pDialog ;
@@ -89,6 +77,8 @@ public class MainActivity extends Activity  {
     private  InputStream mmInStream;
     String data = "";
     String lang = "en-US";
+    boolean flag = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -110,13 +100,33 @@ public class MainActivity extends Activity  {
             if(msg.what==handlerState){
                int writeBuf =  msg.arg1;
                char c = (char)writeBuf;
-                if(c==' '){
-                    speakNow.speak(data,TextToSpeech.QUEUE_FLUSH,null);
-                    data="";
+                Log.i("Here",c+"");
+                if(c=='*'){
+                    flag = true ;
+                    Log.i("Here2",c+"");
+                }else if (c=='+'){
+                    flag=false ;
+                    Log.i("Here3",c+"");
+                }else if(c==' '){
+                    if(flag==true) {
+                        speakNow.setLanguage(new Locale("ar-EG"));
+                        speakNow.speak(data, TextToSpeech.QUEUE_FLUSH, null);
+                        Log.i("Here4",c+"");
+                    }else{
+                        speakNow.setLanguage(Locale.UK);
+                        speakNow.speak(data, TextToSpeech.QUEUE_FLUSH, null);
+                        Log.i("Here5",c+"");
+                    }
+                    textView.setText(data);
+                    data = "";
                 }else{
-                    data+=c ;
+                    if(flag == true ){
+                        data+=mapping(c);
+
+                    }else {
+                        data += c;
+                    }
                 }
-                textView.setText((char)writeBuf+"");
 
             }
             }
@@ -321,7 +331,7 @@ public class MainActivity extends Activity  {
         message("Error");
     }else
     // getResources is function of Context class and activity class extends Context
-    animation.addFrame(this.getResources().getDrawable(viewsId[index]),700);
+    animation.addFrame(this.getResources().getDrawable(Data.viewsId[index]),700);
 }
         animation.setOneShot(true);
         signViews.setBackgroundDrawable(animation);
@@ -330,9 +340,9 @@ public class MainActivity extends Activity  {
     }
 int search (char c){
     Log.i("Tag"," "+c);
-    for(int k = 0 ; k <signChar.length ; k++){
+    for(int k = 0 ; k <Data.signChar.length ; k++){
 
-        if(c==signChar[k]){
+        if(c==Data.signChar[k]){
 
             return  k ;
         }
@@ -430,6 +440,7 @@ private void connect(String Adress) {
 
                         int data =mmInStream.read();
 
+                        Log.i("Test","data"+data);
                         //read bytes from input buffer
                        // String readMessage = new String(buffer, 0, bytes);
                         bluetoothIn.obtainMessage(handlerState,data,0).sendToTarget();
@@ -456,5 +467,14 @@ private void connect(String Adress) {
         } catch (IOException e) {
             message("Error");
         }
+    }
+    public char mapping (char input){
+
+        for(int i = 0 ; i<Data.ENGLISH.length;i++){
+            if(input==Data.ENGLISH[i]){
+                return Data.ARABIC[i];
+            }
+        }
+        return ' ';
     }
 }

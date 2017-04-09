@@ -4,6 +4,7 @@
     <modules>
       <module fileurl="file://$PROJECT_DIR$/Listen_To_Me.iml" filepath="$PROJECT_DIR$/Listen_To_Me.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/speechkit-2.2.1/speechkit-2.2.1.iml" filepath="$PROJECT_DIR$/speechkit-2.2.1/speechkit-2.2.1.iml" />
     </modules>
   </component>
 </project>
