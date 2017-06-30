@@ -33,22 +33,21 @@
         android:layout_width="wrap_content"
         android:layout_height="360dp"
         android:id="@+id/imageView4"
-        android:layout_below="@+id/spinner"
-        android:layout_alignRight="@+id/spinner"
-        android:layout_alignEnd="@+id/spinner"
         android:layout_alignParentLeft="true"
         android:layout_alignParentStart="true"
-        android:layout_centerHorizontal="true"
-        android:layout_above="@+id/textView" />
+        android:layout_above="@+id/textView"
+        android:layout_alignParentRight="true"
+        android:layout_below="@+id/linearLayout" />
 
     <Spinner
-        android:layout_width="fill_parent"
-        android:layout_height="50dp"
+        android:layout_width="70dp"
+        android:layout_height="60dp"
         android:id="@+id/spinner"
-        android:layout_alignParentTop="true"
-        android:background="@android:color/holo_blue_dark"
         android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true" />
+        android:layout_alignParentStart="true"
+        android:background="@android:color/holo_blue_dark"
+        android:layout_alignParentTop="true"
+         />
 
     <TextView
         android:layout_width="wrap_content"
@@ -63,4 +62,52 @@
         android:layout_alignParentStart="true"
         android:layout_alignRight="@+id/button2"
         android:layout_alignEnd="@+id/button2" />
+
+    <ToggleButton
+        android:text="ToggleButton"
+        android:layout_width="wrap_content"
+        android:layout_height="55dp"
+        android:textOff="End"
+        android:textOn="Start"
+        android:id="@+id/toggleButton2"
+        android:layout_centerHorizontal="true"
+        android:background="@color/colorPrimary"/>
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/spinner"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:id="@+id/linearLayout">
+        <Button
+            android:text="Number"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/NumberButton"
+            android:background="@color/colorPrimary"
+             />
+
+        <Button
+            android:text="Letter"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/letterButton"
+            android:paddingTop="10dp"
+            android:background="@color/colorPrimary"
+     />
+
+        <Button
+            android:text="Word"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:id="@+id/wordButton"
+            android:background="@color/colorPrimary"
+            />
+
+
+    </LinearLayout>
+
+
 </RelativeLayout>

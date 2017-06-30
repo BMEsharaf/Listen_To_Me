@@ -2,6 +2,7 @@ package com.example.mohamed.listen_to_me;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.Dialog;
 import android.app.ProgressDialog;
 import android.bluetooth.BluetoothAdapter;
@@ -9,20 +10,15 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothSocket;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.drawable.AnimationDrawable;
-import android.net.Uri;
+import android.media.AudioManager;
 import android.os.Build;
-import android.os.Handler;
-import android.os.Message;
 import android.speech.RecognizerIntent;
 import android.speech.tts.TextToSpeech;
-import android.speech.tts.TextToSpeechService;
-import android.speech.tts.UtteranceProgressListener;
-import android.speech.tts.Voice;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
@@ -31,150 +27,90 @@ import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.widget.ToggleButton;
 
-import com.google.android.gms.appindexing.Action;
-import com.google.android.gms.appindexing.AppIndex;
-import com.google.android.gms.common.api.GoogleApiClient;
-
-import org.w3c.dom.Text;
+import org.ispeech.SpeechSynthesis;
+import org.ispeech.SpeechSynthesisEvent;
+import org.ispeech.error.InvalidApiKeyException;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
-import java.util.UUID;
 
-public class MainActivity extends Activity  {
+public class MainActivity extends Activity {
 
-    Button listen, speech;
+    int result;
+    Button listenBtn, speechBtn, letterButton, numberButton, wordButton;
     ImageView signViews;
-    TextToSpeech speakNow;
+    TextToSpeech ttsSpeech;
     Spinner list;
-    List<String> language ;
-    ArrayList<String> devicesNames , devicesAdress;
-    BluetoothAdapter bt = BluetoothAdapter.getDefaultAdapter();
-
-    BluetoothDevice bluetoothDevice ;
-
-    BluetoothSocket bluetoothSocket ;
-
-    ConnectedThread connectedThread;
-
-    Handler bluetoothIn ;
-    int handlerState ;
-
-       int  VOICE_RECOGNITION = 1 , result;
-    TextView textView ;
-    private final int progress_bar_type = 0 ;
-    ProgressDialog pDialog ;
-    final private int REQUEST_COONECT = 2 ;
-    private  InputStream mmInStream;
-    String data = "";
+    TextView textView;
+    ProgressDialog pDialog;
+    ToggleButton toggleButton;
+    List<String> language = new ArrayList<>();
+    ArrayList<BluetoothDevice> bluetoothDevices = new ArrayList<>();
+    BluetoothAdapter bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+    BluetoothDevice bluetoothDevice;
+    BluetoothSocket bluetoothSocket;
+    BluetoothThread bluetoothThread;
+    ManageBluetoothData manageBluetoothData;
+    boolean listSelection = false;
     String lang = "en-US";
-    boolean flag = false;
+    private static final String TAG = "iSpeech SDK Sample";
+    SpeechSynthesis synthesis;
+    Context _context;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        initiateUI();
-        language = new ArrayList<String>();
-        language.add("English-US");
-        language.add("Arabic");
+        InitiateUI();
 
-        ArrayAdapter<String> LanguageAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, language);
+        language.add("En-US");
+        language.add("Ar-Eg");
+
+        ArrayAdapter<String> LanguageAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, language);
         list.setAdapter(LanguageAdapter);
 
         InitiatTextToSpeech();
-        // Intialize handler object
-        bluetoothIn = new Handler(){
-            @TargetApi(Build.VERSION_CODES.LOLLIPOP)
-            public void handleMessage(android.os.Message msg) {
+        prepareArabicTTSEngine();
+        manageBluetoothData = new ManageBluetoothData(synthesis, textView, ttsSpeech);
 
-            if(msg.what==handlerState){
-               int writeBuf =  msg.arg1;
-               char c = (char)writeBuf;
-                Log.i("Here",c+"");
-                if(c=='*'){
-                    flag = true ;
-                    Log.i("Here2",c+"");
-                }else if (c=='+'){
-                    flag=false ;
-                    Log.i("Here3",c+"");
-                }else if(c==' '){
-                    if(flag==true) {
-                        speakNow.setLanguage(new Locale("ar-EG"));
-                        speakNow.speak(data, TextToSpeech.QUEUE_FLUSH, null);
-                        Log.i("Here4",c+"");
-                    }else{
-                        speakNow.setLanguage(Locale.UK);
-                        speakNow.speak(data, TextToSpeech.QUEUE_FLUSH, null);
-                        Log.i("Here5",c+"");
-                    }
-                    textView.setText(data);
-                    data = "";
-                }else{
-                    if(flag == true ){
-                        data+=mapping(c);
-
-                    }else {
-                        data += c;
-                    }
-                }
-
-            }
-            }
-        };
-
-        /*When Spinner is selected this methode will be invoced "هتشغل"
-
-        * */
         list.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> adapterView, View view, int position, long id) {
 
 
-              if(speakNow!=null&&!speakNow.isSpeaking()){
-                  switch(position) {
+                if (ttsSpeech != null && !ttsSpeech.isSpeaking()) {
+                    switch (position) {
 
-                      case 0:
+                        case 0:
 
-                          lang ="en-US" ;
-                          result = speakNow.setLanguage(Locale.US);
-                          message("English US");
-                          if(result==TextToSpeech.LANG_MISSING_DATA||result==TextToSpeech.ERROR_INVALID_REQUEST) {
-                              Toast.makeText(getBaseContext(),"US is not Supported on your android"+speakNow.isLanguageAvailable(Locale.US) ,Toast.LENGTH_SHORT).show();
-                          }else{
-                              speakNow.setLanguage(Locale.US);
-                          }
-                          break;
-                      case 1:
-                          result=speakNow.setLanguage(new Locale("ar"));
-                          lang = "ar-EG";
-                          if(result==TextToSpeech.LANG_MISSING_DATA||result==TextToSpeech.ERROR_INVALID_REQUEST) {
-                             message("GERMAN is not Supported on your android");
-                          }else{
-                              speakNow.setLanguage(Locale.GERMAN);
-                          }
-                          break;
-                      case 3:
+                            listSelection = true;
+                            lang = "en-US";
+                            result = ttsSpeech.setLanguage(Locale.US);
+                            message("En-US");
+                            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.ERROR_INVALID_REQUEST) {
+                                Toast.makeText(getBaseContext(), "US is not Supported on your android" + ttsSpeech.isLanguageAvailable(Locale.US), Toast.LENGTH_SHORT).show();
+                            } else {
+                                ttsSpeech.setLanguage(Locale.US);
+                            }
+                            break;
+                        case 1:
+                            listSelection = false;
+                            lang = "ar-EG";
+                            prepareArabicTTSEngine();
+                            break;
+                    }
 
-                          result = speakNow.setLanguage(Locale.ITALY);
-                          message("Italy");
-                          if(result==TextToSpeech.LANG_MISSING_DATA||result==TextToSpeech.ERROR_INVALID_REQUEST) {
-                              message("Italy is not Supported on your android");
-                          }else{
-                              speakNow.setLanguage(Locale.ITALY);
-                          }
-                  }
-
-              }
+                }
             }
 
             @Override
@@ -184,118 +120,202 @@ public class MainActivity extends Activity  {
         });
 
 
-        speech.setOnClickListener(new View.OnClickListener() {
+        speechBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if (speakNow != null) {
-                    Speek();
+
+
+                if (ttsSpeech != null && synthesis != null) {
+                    speak(manageBluetoothData);
+
+                } else {
+                    InitiatTextToSpeech();
+                    prepareArabicTTSEngine();
+                    speak(manageBluetoothData);
                 }
             }
         });
 
-        listen.setOnClickListener(new View.OnClickListener() {
+        letterButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (bluetoothThread != null) {
+                    try {
+                        if (listSelection) {
+                            bluetoothThread.sendChar("e");
+                        } else {
+
+                            bluetoothThread.sendChar("f");
+
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+        numberButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                numberButton.setBackgroundColor(Color.RED);
+                if (bluetoothThread != null) {
+                    try {
+                        if (listSelection) {
+                            bluetoothThread.sendChar("g");
+                        } else {
+
+                            bluetoothThread.sendChar("h");
+
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+                numberButton.setBackgroundColor(Color.BLUE);
+            }
+
+        });
+        wordButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (bluetoothThread != null) {
+                    try {
+                        if (listSelection) {
+                            bluetoothThread.sendChar("i");
+                        } else {
+
+                            bluetoothThread.sendChar("j");
+
+                        }
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        });
+        listenBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 voiceRecognize(lang);
             }
         });
+        toggleButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            @Override
+            public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
 
+                if (bluetoothThread != null) {
+                    try {
+                        if (isChecked && listSelection) {
+
+                            bluetoothThread.sendChar("a");
+                        } else if (isChecked && !listSelection) {
+                            bluetoothThread.sendChar("b");
+                        } else if (!isChecked && listSelection) {
+                            bluetoothThread.sendChar("c");
+                        } else if (!isChecked && !listSelection) {
+                            bluetoothThread.sendChar("d");
+                        }
+                    } catch (IOException exception) {
+                        message("Check connection");
+                    }
+                }
+            }
+        });
 
     }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
         getMenuInflater().inflate(R.menu.main, menu);
         return true;
     }
-//
-    public boolean onOptionsItemSelected(MenuItem item) /* select one item from the list  when occur event */{
 
-        switch(item.getItemId())
-        {
-            case R.id.Bluetooth_enable :
-                bt.enable();//
-                return true ;
-            case R.id.Bluetooth_disable :
-                bt.disable();
-                return true ;
+    //
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        switch (item.getItemId()) {
+            case R.id.Bluetooth_enable:
+                bluetoothAdapter.enable();
+                return true;
+            case R.id.Bluetooth_disable:
+                bluetoothAdapter.disable();
+                return true;
             case R.id.bluetooth_discover:
-                // Intent filter is specified mmessage will be send to the broadcast receiver
                 IntentFilter filter = new IntentFilter();
                 filter.addAction(BluetoothDevice.ACTION_FOUND);
                 filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
                 filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-                // Register broadcast receiver to listen for this actions
                 registerReceiver(mReceiver, filter);
-                bt.startDiscovery();
-                return true ;
+                bluetoothAdapter.startDiscovery();
+                return true;
             case R.id.bluetooth_connect:
-                if(bluetoothSocket!=null&&bluetoothSocket.isConnected()==false){
-                    try {
-                        bluetoothSocket.connect();
-                        connectedThread = new ConnectedThread(bluetoothSocket);
-                        connectedThread.start();
-                    } catch (IOException e) {
-                        message("Check connection");
+
+                if (bluetoothSocket == null || !bluetoothSocket.isConnected()) {
+
+                    if (bluetoothDevice != null) {
+                        connect(bluetoothDevice);
+                    } else {
+                        message("Please Start discovery for bluetooth device");
                     }
                 }
+                return true;
             case R.id.bluetooth_disconnect:
-                if(bluetoothSocket!=null&&bluetoothSocket.isConnected()&&mmInStream!=null){
+                if (bluetoothSocket != null && bluetoothThread != null) {
                     try {
                         bluetoothSocket.close();
-                        mmInStream.close();
+                        bluetoothThread.terminate();
+                        bluetoothThread.inputStream.close();
+                        bluetoothThread.outputStream.close();
+                        bluetoothSocket = null;
                     } catch (IOException e) {
                         message("Check connection");
                     }
                 }
-            default :
-                return true ;
+            default:
+                return true;
         }
 
     }
-    private void initiateUI (){
-        listen = (Button) findViewById(R.id.button);// init user interface object  from layout
-        speech = (Button) findViewById(R.id.button2);
+
+    private void InitiateUI() {
+        listenBtn = (Button) findViewById(R.id.button);// init user interface object  from layout
+        speechBtn = (Button) findViewById(R.id.button2);
+        letterButton = (Button) findViewById(R.id.letterButton);
+        numberButton = (Button) findViewById(R.id.NumberButton);
+        wordButton = (Button) findViewById(R.id.wordButton);
         signViews = (ImageView) findViewById(R.id.imageView4);
-        list = (Spinner) findViewById(R.id.spinner);/*consists from data,rander,events
-        and  spinner this is class whice have setadaptor function which collect data,rander,events*/
+        list = (Spinner) findViewById(R.id.spinner);
         textView = (TextView) findViewById(R.id.textView);
+        toggleButton = (ToggleButton) findViewById(R.id.toggleButton2);
     }
 
-    private void Speek() {
-
-        if(bluetoothSocket!=null){
-         connectedThread = new ConnectedThread(bluetoothSocket);
-            connectedThread.start();
-        }
-    }
 
     private void voiceRecognize(String language) {
 
         Intent voicerecogizeIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
-        voicerecogizeIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
-        voicerecogizeIntent.putExtra(RecognizerIntent.EXTRA_PROMPT,"Speak Now");
-        voicerecogizeIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,1);
-        voicerecogizeIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE,language);
-        startActivityForResult(voicerecogizeIntent,VOICE_RECOGNITION);
+        voicerecogizeIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
+        voicerecogizeIntent.putExtra(RecognizerIntent.EXTRA_PROMPT, "speak Now");
+        voicerecogizeIntent.putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1);
+        voicerecogizeIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, language);
+        startActivityForResult(voicerecogizeIntent, Data.VOICE_RECOGNITION);
     }
 
     private void InitiatTextToSpeech() {
-        speakNow = new TextToSpeech(getBaseContext(), new TextToSpeech.OnInitListener() {
+        ttsSpeech = new TextToSpeech(this, new TextToSpeech.OnInitListener() {
             @Override
             public void onInit(int status) {
 
                 if (status == TextToSpeech.SUCCESS) {
-                    if (speakNow.isLanguageAvailable(Locale.US) >= 0) {
-                        speakNow.setLanguage(Locale.US);
-                        speakNow.setPitch(.8f);
-                        speakNow.setSpeechRate(1.4f);
+                    if (ttsSpeech.isLanguageAvailable(Locale.US) >= 0) {
+                        ttsSpeech.setLanguage(Locale.US);
+                        ttsSpeech.setPitch(.8f);
+                        ttsSpeech.setSpeechRate(1.4f);
 
                     } else {
-                        Toast.makeText(getBaseContext(), "Please Change Language", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getBaseContext(), "This language is not supported", Toast.LENGTH_SHORT).show();
                     }
-                }
-                else{
+                } else {
                     message("Error in TTS");
                 }
             }
@@ -306,49 +326,52 @@ public class MainActivity extends Activity  {
     protected void onActivityResult(int requestCode,
                                     int resultCode, Intent data) {
 
-        if (requestCode == VOICE_RECOGNITION && resultCode == RESULT_OK) {
+        if (requestCode == Data.VOICE_RECOGNITION && resultCode == RESULT_OK) {
             ArrayList<String> sentences = data.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS);
-            Toast.makeText(getBaseContext(),sentences.get(0),Toast.LENGTH_SHORT).show();
+            Toast.makeText(getBaseContext(), sentences.get(0), Toast.LENGTH_SHORT).show();
             convertToSign(sentences.get(0).toLowerCase());
-        } else if (requestCode == REQUEST_COONECT && resultCode == RESULT_OK) {
-            message(data.getStringExtra("Device address"));
-            connect(data.getStringExtra("Device address"));
-          super.onActivityResult(requestCode, resultCode, data);
+        } else if (requestCode == Data.REQUEST_CONNECT && resultCode == RESULT_OK) {
+            bluetoothDevice = data.getExtras().getParcelable("Device object");
+            if (bluetoothDevice != null) {
+                message(bluetoothDevice.getAddress());
+                connect(bluetoothDevice);
+            }
+            super.onActivityResult(requestCode, resultCode, data);
         }
     }
 
-    private void message(String mess){
+    private void message(String mess) {
+        Toast.makeText(getBaseContext(), mess, Toast.LENGTH_SHORT).show();
 
-        Toast.makeText(getBaseContext(),mess,Toast.LENGTH_SHORT).show();
     }
+
     private void convertToSign(String sentence) {
-        int index ;
+        int index;
         textView.setText(sentence);
-        AnimationDrawable animation=new AnimationDrawable();
- for(int i = 0 ; i< sentence.length() ; i++){
-    index = search(sentence.charAt(i));
-    if(index==-1){
-        message("Error");
-    }else
-    // getResources is function of Context class and activity class extends Context
-    animation.addFrame(this.getResources().getDrawable(Data.viewsId[index]),700);
-}
+        AnimationDrawable animation = new AnimationDrawable();
+        for (int i = 0; i < sentence.length(); i++) {
+            index = search(sentence.charAt(i));
+            if (index == -1) {
+                message("Error");
+            } else
+                animation.addFrame(this.getResources().getDrawable(Data.viewsId[index]), 700);
+        }
         animation.setOneShot(true);
         signViews.setBackgroundDrawable(animation);
         animation.start();
-
     }
-int search (char c){
-    Log.i("Tag"," "+c);
-    for(int k = 0 ; k <Data.signChar.length ; k++){
 
-        if(c==Data.signChar[k]){
+    int search(char c) {
 
-            return  k ;
+        for (int k = 0; k < Data.signChar.length; k++) {
+
+            if (c == Data.signChar[k]) {
+
+                return k;
+            }
         }
+        return -2;
     }
-    return -2 ;
-}
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -356,40 +379,32 @@ int search (char c){
             String action = intent.getAction();
             if (BluetoothAdapter.ACTION_DISCOVERY_STARTED.equals(action)) {
                 message("Started");
-                devicesAdress = new ArrayList<String>();
-                devicesNames = new ArrayList<String>() ;
-                // Start Showing dialog to wait
-                showDialog(progress_bar_type);
+                bluetoothDevices = new ArrayList<>();
+                showDialog(Data.progress_bar_type);
             } else if (BluetoothAdapter.ACTION_DISCOVERY_FINISHED.equals(action)) {
-               // End the dialog
                 pDialog.dismiss();
-                if(devicesNames!=null) {
-                    Intent intent2 = new Intent(getBaseContext(), BluetoothList.class);
-                    intent2.putStringArrayListExtra("Array list", devicesNames);
-                    intent2.putStringArrayListExtra("Array addresses", devicesAdress);
-                    startActivityForResult(intent2,REQUEST_COONECT);
+                if (bluetoothDevices != null) {
+                    Intent intent2 = new Intent(MainActivity.this, BluetoothList.class);
+                    intent2.putParcelableArrayListExtra("Bluetooth", bluetoothDevices);
+                    startActivityForResult(intent2, Data.REQUEST_CONNECT);
 
-                }else{
+                } else {
                     message("No devices found");
                 }
 
             } else if (BluetoothDevice.ACTION_FOUND.equals(action)) {
-                //bluetooth device found
-                BluetoothDevice device = (BluetoothDevice) intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                devicesNames.add(device.getName());
-                devicesAdress.add(device.getAddress());
 
+                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+                bluetoothDevices.add(device);
             }
         }
     };
 
-    /**
-     * Showing Dialog
-     * */
+
     @Override
     protected Dialog onCreateDialog(int id) {
         switch (id) {
-            case progress_bar_type:
+            case Data.progress_bar_type:
                 pDialog = new ProgressDialog(this);
                 pDialog.setMessage("Scanning... Please wait...");
                 pDialog.setIndeterminate(false);
@@ -402,79 +417,109 @@ int search (char c){
                 return null;
         }
     }
-@TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1)
-private void connect(String Adress) {
-    bluetoothDevice = bt.getRemoteDevice(Adress);
-    try {
-        bluetoothSocket = bluetoothDevice.createInsecureRfcommSocketToServiceRecord(bluetoothDevice.getUuids()[0].getUuid());
-        message("OK");
-    } catch (IOException ConnectionError) {
-        message("Error in connection");
-    }
-    try {
-        bluetoothSocket.connect();
-    } catch (IOException e) {
-        message(e.getMessage());
-    }
-}
-    private class ConnectedThread extends Thread {
 
-        public StringBuilder vocab = null;
-        //creation of the connect thread
-        public ConnectedThread(BluetoothSocket socket) {
-            InputStream tmpIn = null;
-            try {
-                //Create I/O streams for connection
-                tmpIn = socket.getInputStream();
-            } catch (IOException e) {
-            }
+    @TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1)
+    private void connect(BluetoothDevice deviceAddress) {
 
-            mmInStream = tmpIn;
+        try {
 
-        }
-
-        public void run() {
-
-            try {
-            while (true) {
-
-                        int data =mmInStream.read();
-
-                        Log.i("Test","data"+data);
-                        //read bytes from input buffer
-                       // String readMessage = new String(buffer, 0, bytes);
-                        bluetoothIn.obtainMessage(handlerState,data,0).sendToTarget();
-
-
-            }
-            } catch (IOException e) {
-
-            }
+            bluetoothSocket = deviceAddress.createInsecureRfcommSocketToServiceRecord(deviceAddress.getUuids()[0].getUuid());
+            bluetoothSocket.connect();
+        } catch (IOException ConnectionError) {
+            message("Error in connection");
+        } catch (NullPointerException ex) {
+            message("Please ensure bond to HC-O5");
         }
     }
+
+    private void speak(ManageBluetoothData manageBluetoothData1) {
+
+        if (bluetoothSocket != null && manageBluetoothData1 != null) {
+            try {
+                bluetoothThread = new BluetoothThread(bluetoothSocket, manageBluetoothData1);
+                bluetoothThread.start();
+            } catch (IOException ex) {
+                message("Error for creating new Thread");
+            }
+
+
+        }
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+
         try {
-        if (speakNow != null&&connectedThread!=null) {
-            speakNow.stop();
-            speakNow.shutdown();
-            mmInStream.close();
-            bluetoothSocket.close();
-        }
+
+
+                if (ttsSpeech != null) {
+                    ttsSpeech.stop();
+                    ttsSpeech.shutdown();
+
+                }
+
+                if(synthesis!=null){
+                    synthesis.stop();
+                }
+
+                if(bluetoothSocket!=null) {
+                    bluetoothSocket.close();
+                }
+                if(bluetoothThread != null) {
+                    bluetoothThread.interrupt();
+                    bluetoothThread.inputStream.close();
+                    bluetoothThread.outputStream.close();
+                }
+
 
 
         } catch (IOException e) {
             message("Error");
         }
     }
-    public char mapping (char input){
 
-        for(int i = 0 ; i<Data.ENGLISH.length;i++){
-            if(input==Data.ENGLISH[i]){
-                return Data.ARABIC[i];
-            }
+    private void prepareArabicTTSEngine() {
+        try {
+            synthesis = SpeechSynthesis.getInstance(this);
+            synthesis.setVoiceType("arabicmale");
+            synthesis.setStreamType(AudioManager.STREAM_MUSIC);
+            synthesis.setSpeechSynthesisEvent(new SpeechSynthesisEvent() {
+
+                public void onPlaySuccessful() {
+
+                }
+
+                public void onPlayStopped() {
+
+                }
+
+                public void onPlayFailed(Exception e) {
+
+                    AlertDialog.Builder builder = new AlertDialog.Builder(MainActivity.this);
+                    builder.setMessage("Error[TTSActivity]: " + e.toString())
+                            .setCancelable(false)
+                            .setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                                public void onClick(DialogInterface dialog, int id) {
+                                }
+                            });
+                    AlertDialog alert = builder.create();
+                    alert.show();
+                }
+
+                public void onPlayStart() {
+
+                }
+
+                @Override
+                public void onPlayCanceled() {
+
+                }
+            });
+
+        } catch (InvalidApiKeyException e) {
+            Log.e(TAG, "Invalid API key\n" + Arrays.toString(e.getStackTrace()));
+            Toast.makeText(_context, "ERROR: Invalid API key", Toast.LENGTH_LONG).show();
         }
-        return ' ';
     }
 }
